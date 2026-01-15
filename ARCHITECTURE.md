@@ -1,4 +1,4 @@
-# 🚀 Book Management REST API  ARCHITECTURE
+# 🚀 MULTI TENEANT REST API  ARCHITECTURE  
 
 ---
 ## 📌 1. Overview

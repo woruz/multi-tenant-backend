@@ -143,7 +143,7 @@ Enables dashboard stock movement graphs
 Stock values in Variant represent current state, while StockMovement represents history.
 
 
-## 📌 6. Concurrency & Race Condition Handling
+## 📌 6. Concurrency & Race Condition Handling  
 
 ### 6.1 Order Placement (Last Item Problem)
 
@@ -153,3 +153,143 @@ Two users attempt to order the last available unit of a variant at the same time
 
 #### Solution:
 A hybrid approach using Redis distributed locks and MongoDB atomic updates.
+
+Flow
+
+1:- Acquire Redis lock per variant:
+
+``bash
+lock:variant:<variantId>
+```
+
+2:- Start MongoDB transaction
+
+3:- Atomically decrement stock using:
+
+```bash
+stock: { $gte: quantity }
+```
+
+4:- Create stock movement and order
+
+5:- Commit transaction
+
+6:- Release Redis locks
+
+Why This Works
+---
+    Redis prevents concurrent attempts across instances
+
+    MongoDB guarantees stock never becomes negative
+
+    Transactions ensure rollback on failure
+---
+This design provides strong consistency and predictable behavior under load.
+
+### 6.2 Purchase Order Receiving (Workflow Locking)
+
+#### Problem:
+Two users attempt to receive the same Purchase Order simultaneously, causing duplicate stock increments.
+
+#### Solution:
+Redis distributed lock at Purchase Order level.
+
+```bash
+lock:purchaseOrder:<purchaseOrderId>
+```
+
+Only one receive operation can proceed at a time.
+
+MongoDB transactions are used to:
+
+Update received quantities
+
+Update variant stock
+
+Insert stock movements
+
+Update PO status (CONFIRMED / RECEIVED)
+
+This ensures idempotent PO processing.
+
+## 📌 7. Purchase Orders 
+
+Purchase Orders support:
+
+Multiple items (variants)
+
+Partial deliveries
+
+Price variance handling
+
+Status lifecycle:
+
+```bash
+DRAFT → SENT → CONFIRMED → RECEIVED
+```
+
+## 📌 8. Dashboard & Analytics  
+
+### 8.1 Key Metrics
+
+Inventory value (stock × price)
+
+Low-stock items (considering pending POs)
+
+Top 5 selling variants (last 30 days)
+
+Stock movement trend (last 7 days)
+
+### 8.2 Performance Strategy
+
+Aggregation pipelines using indexed fields
+
+Pre-filtered by tenantId
+
+Time-bounded queries
+
+Lightweight projections
+
+With proper indexing, dashboards load in <2 seconds with 10,000+ variants.
+
+## 📌 9. Real-Time Updates 
+
+Socket.io used for real-time stock updates
+
+Events emitted on:
+---
+    Order placement
+
+    Purchase Order receiving
+---
+```bash
+stockUpdated:<tenantId>
+```
+Clients subscribe per tenant, ensuring isolation.
+
+## 📌 10. Data Integrity Guarantees
+
+Stock never becomes negative
+
+All stock mutations occur inside transactions
+
+Redis locks prevent duplicate workflows
+
+All failures result in full rollback
+
+## 📌 11. Scalability Considerations 
+
+Stateless backend → horizontal scaling
+
+Redis locks work across instances
+
+Row-level multi-tenancy supports thousands of tenants
+
+Can migrate high-value tenants to dedicated DBs later
+
+## 📌 12. Trade-Offs & Future Improvements
+
+### Current Trade-Offs
+---
+Redis adds operational complexity
+---

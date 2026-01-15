@@ -48,7 +48,7 @@ This approach is suitable for early-stage SaaS and supports horizontal scaling.
 
 ---
 
-## 📌 3. Authentication & Authorization
+## 📌 3. Authentication & Authorization   
 
 JWT-based authentication
 
@@ -66,3 +66,90 @@ Role-based access control using roles:
     STAFF
 ---
 Authorization is enforced via middleware before route execution.
+
+## 📌 4. Inventory Data Modeling  
+
+## 4.1 Product & Variant Modeling
+
+Products and variants are modeled as separate collections.
+
+Product
+
+```bash
+{
+  _id,
+  tenantId,
+  name,
+  description
+}
+```
+Variant
+
+```bash
+{
+  _id,
+  tenantId,
+  productId,
+  sku,
+  attributes: { size, color },
+  stock,
+  reorderLevel,
+  price
+}
+```
+
+Why Separate Variant Collection
+
+Each variant represents a sellable SKU
+
+Enables independent stock tracking
+
+Simplifies indexing and concurrency control
+
+Avoids large nested arrays in Product documents
+
+This allows modeling combinations like:
+
+---
+
+T-Shirt → 3 sizes × 3 colors = 9 SKUs
+
+---
+
+## 📌 5. Stock Movement Tracking
+
+All stock changes are recorded in a StockMovement collection.
+
+```bash
+{
+  tenantId,
+  variantId,
+  type: "PURCHASE" | "SALE" | "ADJUSTMENT" | "RETURN",
+  quantity,
+  orderId?,
+  purchaseOrderId?,
+  createdAt
+}
+```
+
+Benefits
+
+Full audit trail
+
+Time-series analytics
+
+Enables dashboard stock movement graphs
+
+Stock values in Variant represent current state, while StockMovement represents history.
+
+
+## 📌 6. Concurrency & Race Condition Handling
+
+### 6.1 Order Placement (Last Item Problem)
+
+
+#### Problem:
+Two users attempt to order the last available unit of a variant at the same time.
+
+#### Solution:
+A hybrid approach using Redis distributed locks and MongoDB atomic updates.
